@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>家庭藏书管理系统</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f0f2f5;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px;
+            background: #2c3e50;
+            color: white;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .music-control {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+        }
+
+        .form-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        input, select, textarea {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        .book-list {
+            margin-top: 20px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        tr:hover {
+            background: #f5f5f5;
+        }
+
+        .book-cover {
+            max-width: 100px;
+            max-height: 100px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏠 家庭藏书管理系统</h1>
+            <div class="music-control">
+                <audio id="bg-music" loop>
+                    <source src="your-music-file.mp3" type="audio/mpeg">
+                    您的浏览器不支持音频播放
+                </audio>
+                <button onclick="toggleMusic()">🎵 播放/暂停音乐</button>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h2>📖 添加新书</h2>
+            <div class="form-row">
+                <input type="text" id="title" placeholder="书名">
+                <input type="text" id="author" placeholder="作者">
+                <input type="text" id="category" placeholder="分类">
+                <input type="text" id="country" placeholder="国家">
+                <input type="date" id="purchaseDate">
+                <input type="number" id="price" placeholder="价格">
+                <input type="date" id="finishDate">
+            </div>
+            <div class="form-row">
+                <textarea id="notes" placeholder="阅读笔记" rows="3"></textarea>
+                <input type="file" id="cover" accept="image/*">
+            </div>
+            <button onclick="addBook()">添加书籍</button>
+            <button onclick="exportData()">导出数据</button>
+            <input type="file" id="importFile" accept=".json" onchange="importData()">
+        </div>
+
+        <div class="form-section">
+            <h2>🔍 搜索书籍</h2>
+            <div class="form-row">
+                <input type="text" id="search" placeholder="输入关键词搜索" onkeyup="searchBooks()">
+                <select id="filterCategory" onchange="filterBooks()">
+                    <option value="">所有分类</option>
+                </select>
+                <select id="filterCountry" onchange="filterBooks()">
+                    <option value="">所有国家</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="book-list">
+            <table id="bookTable">
+                <thead>
+                    <tr>
+                        <th>封面</th>
+                        <th>书名</th>
+                        <th>作者</th>
+                        <th>分类</th>
+                        <th>国家</th>
+                        <th>购买日期</th>
+                        <th>价格</th>
+                        <th>完成日期</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="bookBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let books = JSON.parse(localStorage.getItem('books')) || [];
+        
+        // 初始化分类和国家选项
+        function initFilters() {
+            const categories = [...new Set(books.map(b => b.category))];
+            const countries = [...new Set(books.map(b => b.country))];
+            
+            updateFilterOptions('filterCategory', categories);
+            updateFilterOptions('filterCountry', countries);
+        }
+
+        function updateFilterOptions(elementId, values) {
+            const select = document.getElementById(elementId);
+            select.innerHTML = elementId === 'filterCategory' ? '<option value="">所有分类</option>' : '<option value="">所有国家</option>';
+            
+            values.forEach(value => {
+                if (value) {
+                    const option = document.createElement('option');
+                    option.value = value;
+                    option.textContent = value;
+                    select.appendChild(option);
+                }
+            });
+        }
+
+        function addBook() {
+            const book = {
+                id: Date.now(),
+                title: document.getElementById('title').value,
+                author: document.getElementById('author').value,
+                category: document.getElementById('category').value,
+                country: document.getElementById('country').value,
+                purchaseDate: document.getElementById('purchaseDate').value,
+                price: document.getElementById('price').value,
+                finishDate: document.getElementById('finishDate').value,
+                notes: document.getElementById('notes').value,
+                cover: ''
+            };
+
+            const fileInput = document.getElementById('cover');
+            if (fileInput.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    book.cover = e.target.result;
+                    saveBook(book);
+                }
+                reader.readAsDataURL(fileInput.files[0]);
+            } else {
+                saveBook(book);
+            }
+        }
+// 修改后的saveBook函数（增加去换行处理）
+function saveBook(book) {
+    // 清除笔记中的换行符
+    book.notes = book.notes.replace(/\n/g, ' ');
+    books.push(book);
+    localStorage.setItem('books', JSON.stringify(books));
+    refreshTable();
+    initFilters();
+    clearForm();
+}
+        function refreshTable() {
+            const tbody = document.getElementById('bookBody');
+            tbody.innerHTML = '';
+            
+            books.forEach(book => {
+                const row = `
+                    <tr>
+                        <td>${book.cover ? `<img src="${book.cover}" class="book-cover">` : ''}</td>
+                        <td>${book.title}</td>
+                        <td>${book.author}</td>
+                        <td>${book.category}</td>
+                        <td>${book.country}</td>
+                        <td>${book.purchaseDate}</td>
+                        <td>${book.price}</td>
+                        <td>${book.finishDate}</td>
+                        <td>
+                            <button onclick="showDetails(${book.id})">详情</button>
+                            <button onclick="deleteBook(${book.id})">删除</button>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+
+        function showDetails(id) {
+            const book = books.find(b => b.id === id);
+            alert(`阅读笔记：\n${book.notes}`);
+        }
+
+        function deleteBook(id) {
+            books = books.filter(b => b.id !== id);
+            localStorage.setItem('books', JSON.stringify(books));
+            refreshTable();
+            initFilters();
+        }
+
+        function searchBooks() {
+            const keyword = document.getElementById('search').value.toLowerCase();
+            books = JSON.parse(localStorage.getItem('books')) || [];
+            books = books.filter(b => 
+                b.title.toLowerCase().includes(keyword) ||
+                b.author.toLowerCase().includes(keyword) ||
+                b.category.toLowerCase().includes(keyword)
+            );
+            refreshTable();
+        }
+
+        function filterBooks() {
+            const category = document.getElementById('filterCategory').value;
+            const country = document.getElementById('filterCountry').value;
+            
+            books = JSON.parse(localStorage.getItem('books')) || [];
+            
+            if (category) books = books.filter(b => b.category === category);
+            if (country) books = books.filter(b => b.country === country);
+            
+            refreshTable();
+        }
+function exportData() {
+    // CSV标题行
+    const csvContent = [
+        ['书名', '作者', '分类', '国家', '购买日期', '价格', '完成日期', '阅读笔记'].join(','),
+        ...books.map(book => [
+            `"${book.title.replace(/"/g, '""')}"`,  // 处理双引号
+            `"${book.author.replace(/"/g, '""')}"`,
+            `"${book.category.replace(/"/g, '""')}"`,
+            `"${book.country.replace(/"/g, '""')}"`,
+            book.purchaseDate,
+            book.price,
+            book.finishDate,
+            `"${book.notes.replace(/"/g, '""').replace(/\n/g, ' ')}"`  // 处理换行符
+        ].join(','))
+    ].join('\n');
+
+    // 创建CSV文件
+    const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute("href", url);
+    link.setAttribute("download", "藏书清单.csv");
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+        function importData() {
+            const file = document.getElementById('importFile').files[0];
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                books = JSON.parse(e.target.result);
+                localStorage.setItem('books', JSON.stringify(books));
+                refreshTable();
+                initFilters();
+            }
+            
+            reader.readAsText(file);
+        }
+
+        function toggleMusic() {
+            const audio = document.getElementById('bg-music');
+            audio.paused ? audio.play() : audio.pause();
+        }
+
+        function clearForm() {
+            document.querySelectorAll('.form-section input, .form-section textarea').forEach(element => {
+                element.value = '';
+            });
+        }
+
+        // 初始化
+        window.onload = function() {
+            refreshTable();
+            initFilters();
+        }
+    </script>
+</body>
+</html>
